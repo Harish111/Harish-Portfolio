@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/Harish-Portfolio/static/css/main.914d07b8.css",
+    "main.js": "/Harish-Portfolio/static/js/main.3679e18a.js",
+    "static/js/453.230f01d4.chunk.js": "/Harish-Portfolio/static/js/453.230f01d4.chunk.js",
+    "index.html": "/Harish-Portfolio/index.html",
+    "main.914d07b8.css.map": "/Harish-Portfolio/static/css/main.914d07b8.css.map",
+    "main.3679e18a.js.map": "/Harish-Portfolio/static/js/main.3679e18a.js.map",
+    "453.230f01d4.chunk.js.map": "/Harish-Portfolio/static/js/453.230f01d4.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.914d07b8.css",
+    "static/js/main.3679e18a.js"
+  ]
+}
