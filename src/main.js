@@ -76,16 +76,26 @@ courtyard.position.y = 0.03;
 courtyard.receiveShadow = true;
 scene.add(courtyard);
 
-// Japanese castle (tenshu) — sloped stone base + stacked white tiers with
-// dark flared roofs and a golden finial on top.
+// Japanese castle (tenshu) — sloped stone base + white tiers, each capped by a
+// wide, shallow, dark hip roof with big overhanging eaves and a chidori-hafu
+// gable on the front. Topped with golden shachihoko ornaments.
 function makeCastle() {
   const g = new THREE.Group();
   const stone = new THREE.MeshStandardMaterial({ color: '#9a9387', roughness: 1, flatShading: true });
   const wall = new THREE.MeshStandardMaterial({ color: '#f3efe6', roughness: 0.9 });
-  const roofMat = new THREE.MeshStandardMaterial({ color: '#33414f', roughness: 0.85, flatShading: true });
-  const gold = new THREE.MeshStandardMaterial({ color: '#d9a93a', metalness: 0.4, roughness: 0.35 });
+  const roofMat = new THREE.MeshStandardMaterial({ color: '#3a4654', roughness: 0.8, flatShading: true });
+  const roofEdge = new THREE.MeshStandardMaterial({ color: '#2a333d', roughness: 0.8, flatShading: true });
+  const gold = new THREE.MeshStandardMaterial({ color: '#d9a93a', metalness: 0.45, roughness: 0.35 });
 
-  // Sloped stone base (4-sided frustum) — kept low so the tower dominates
+  // White triangular gable (chidori-hafu) that sits on the front roof slope.
+  function gable(width, height, depth) {
+    const s = new THREE.Shape();
+    s.moveTo(-width / 2, 0); s.lineTo(width / 2, 0); s.lineTo(0, height); s.closePath();
+    const geo = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false });
+    return new THREE.Mesh(geo, wall);
+  }
+
+  // Sloped stone base (4-sided frustum), kept low so the tower dominates.
   const base = new THREE.Mesh(new THREE.CylinderGeometry(7.0, 9.0, 3.0, 4), stone);
   base.rotation.y = Math.PI / 4;
   base.position.y = 1.5;
@@ -94,37 +104,79 @@ function makeCastle() {
 
   let y = 3.0;
   const tiers = [
-    { w: 10.0, h: 2.9, rr: 7.6, rh: 2.0 },
-    { w: 7.8, h: 2.6, rr: 5.9, rh: 1.8 },
-    { w: 5.8, h: 2.3, rr: 4.5, rh: 1.6 },
+    { w: 10.0, h: 2.6 },
+    { w: 7.6, h: 2.3 },
+    { w: 5.2, h: 2.0 },
   ];
-  for (const t of tiers) {
+  tiers.forEach((t, i) => {
+    const isTop = i === tiers.length - 1;
     // white wall
     const w = new THREE.Mesh(new THREE.BoxGeometry(t.w, t.h, t.w), wall);
     w.position.y = y + t.h / 2; w.castShadow = true; g.add(w);
-    // dark window band
-    const band = new THREE.Mesh(new THREE.BoxGeometry(t.w + 0.05, t.h * 0.4, t.w + 0.05), roofMat);
-    band.position.y = y + t.h * 0.62; g.add(band);
+    // a thin dark window row near the top of the wall
+    const band = new THREE.Mesh(new THREE.BoxGeometry(t.w + 0.06, 0.55, t.w + 0.06), roofEdge);
+    band.position.y = y + t.h - 0.55; g.add(band);
     y += t.h;
-    // flared eave (short, slightly wider frustum)
-    const eave = new THREE.Mesh(new THREE.CylinderGeometry(t.rr, t.rr + 0.7, 0.35, 4), roofMat);
-    eave.rotation.y = Math.PI / 4; eave.position.y = y + 0.18; eave.castShadow = true; g.add(eave);
-    // pyramidal roof
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(t.rr, t.rh, 4), roofMat);
-    roof.rotation.y = Math.PI / 4; roof.position.y = y + 0.35 + t.rh / 2; roof.castShadow = true; g.add(roof);
-    y += 0.35 + t.rh;
+
+    // --- roof: wide shallow hip roof with a big eave overhang ---
+    const over = 1.3;
+    const ew = t.w + over * 2;          // eave footprint width
+    const rh = ew * 0.17;               // shallow pitch
+    const eave = new THREE.Mesh(new THREE.BoxGeometry(ew, 0.4, ew), roofEdge);
+    eave.position.y = y + 0.2; eave.castShadow = true; g.add(eave);
+    const R = (ew / 2) * Math.SQRT2;    // circumradius so flat faces align with eave
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(R, rh, 4), roofMat);
+    roof.rotation.y = Math.PI / 4;
+    roof.position.y = y + 0.4 + rh / 2; roof.castShadow = true; g.add(roof);
+    // chidori-hafu gable on the front slope (not on the top tier)
+    if (!isTop) {
+      const gw = t.w * 0.55, gh = rh * 0.95;
+      const gb = gable(gw, gh, 0.5);
+      gb.position.set(-gw / 2, y + 0.4, ew / 2 - 1.05);
+      g.add(gb);
+    }
+    y += 0.4 + rh + 0.05;
+  });
+
+  // golden shachihoko (mythical fish) flanking the top ridge + finial
+  for (const sx of [-1, 1]) {
+    const fish = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.8, 4), gold);
+    fish.rotation.y = Math.PI / 4;
+    fish.rotation.z = sx * 0.35;
+    fish.position.set(sx * 1.1, y - 0.5, 0);
+    g.add(fish);
   }
-  // golden finial
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 1.1, 8), gold);
-  pole.position.y = y + 0.55; g.add(pole);
-  const orb = new THREE.Mesh(new THREE.IcosahedronGeometry(0.42, 0), gold);
-  orb.position.y = y + 1.25; g.add(orb);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.8, 8), gold);
+  pole.position.y = y + 0.3; g.add(pole);
+  const orb = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 10), gold);
+  orb.position.y = y + 0.8; g.add(orb);
   return g;
 }
 const castle = makeCastle();
-castle.scale.setScalar(0.9);
+castle.scale.setScalar(0.92);
 scene.add(castle);
 const CASTLE_RADIUS = 12; // keep the car from driving through it
+
+// Distant snow-capped volcanoes (Fuji + Yotei) as a backdrop. fog:false so
+// they read as a clear, faraway horizon rising above the misty treeline.
+function makeMountain({ radius, height, color }) {
+  const m = new THREE.Group();
+  const rock = new THREE.MeshStandardMaterial({ color, roughness: 1, flatShading: true, fog: false });
+  const snow = new THREE.MeshStandardMaterial({ color: '#f4f7fb', roughness: 1, flatShading: true, fog: false });
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(radius, height, 7), rock);
+  cone.position.y = height / 2; m.add(cone);
+  const cap = new THREE.Mesh(new THREE.ConeGeometry(radius * 0.42, height * 0.42, 7), snow);
+  cap.position.y = height - height * 0.21; m.add(cap);
+  return m;
+}
+// Mount Fuji — broad, iconic, back-left
+const fuji = makeMountain({ radius: 95, height: 80, color: '#6f8198' });
+fuji.position.set(-205, 0, -205);
+scene.add(fuji);
+// Mount Yotei (Ezo-Fuji) — back-right
+const yotei = makeMountain({ radius: 80, height: 72, color: '#74899c' });
+yotei.position.set(215, 0, -185);
+scene.add(yotei);
 
 // ---------------------------------------------------------------------------
 // Prop factories (all low-poly, built from primitives)
