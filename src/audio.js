@@ -13,6 +13,24 @@ let started = false;
 let playing = false;
 const timers = [];
 
+// --- Optional real soundtrack ---------------------------------------------
+// If a licensed track exists at public/audio/music.mp3 it is used instead of
+// the procedural score below. Drop a royalty-free file there and it just works.
+const FILE_URL = import.meta.env.BASE_URL + 'audio/music.mp3';
+let fileEl = null; // HTMLAudioElement once confirmed present
+(function probeFile() {
+  fetch(FILE_URL, { method: 'HEAD' })
+    .then((r) => {
+      if (r.ok) {
+        fileEl = new Audio(FILE_URL);
+        fileEl.loop = true;
+        fileEl.preload = 'auto';
+        fileEl.volume = 0.55;
+      }
+    })
+    .catch(() => { /* no file: fall back to procedural */ });
+})();
+
 // D Kumoi scale across two octaves (Hz): D E F A B
 const MELODY = [
   293.66, 329.63, 349.23, 440.0, 493.88, // D4 E4 F4 A4 B4
@@ -202,6 +220,12 @@ function ensureContext() {
 
 // Toggle playback. Returns the new playing state. Call from a click handler.
 export function toggleAudio() {
+  // If a real soundtrack file is present, play that and skip the synth.
+  if (fileEl) {
+    if (fileEl.paused) { fileEl.play().catch(() => {}); return true; }
+    fileEl.pause();
+    return false;
+  }
   ensureContext();
   if (ctx.state === 'suspended') ctx.resume();
   if (!started) { started = true; startWind(); }

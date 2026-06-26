@@ -84,72 +84,68 @@ function makeCastle() {
   const stone = new THREE.MeshStandardMaterial({ color: '#9a9387', roughness: 1, flatShading: true });
   const wall = new THREE.MeshStandardMaterial({ color: '#f3efe6', roughness: 0.9 });
   const roofMat = new THREE.MeshStandardMaterial({ color: '#3a4654', roughness: 0.8, flatShading: true });
-  const roofEdge = new THREE.MeshStandardMaterial({ color: '#2a333d', roughness: 0.8, flatShading: true });
+  const roofEdge = new THREE.MeshStandardMaterial({ color: '#262f38', roughness: 0.8, flatShading: true });
   const gold = new THREE.MeshStandardMaterial({ color: '#d9a93a', metalness: 0.45, roughness: 0.35 });
 
-  // White triangular gable (chidori-hafu) that sits on the front roof slope.
-  function gable(width, height, depth) {
-    const s = new THREE.Shape();
-    s.moveTo(-width / 2, 0); s.lineTo(width / 2, 0); s.lineTo(0, height); s.closePath();
-    const geo = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false });
-    return new THREE.Mesh(geo, wall);
-  }
-
   // Sloped stone base (4-sided frustum), kept low so the tower dominates.
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(7.0, 9.0, 3.0, 4), stone);
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(7.0, 9.0, 2.6, 4), stone);
   base.rotation.y = Math.PI / 4;
-  base.position.y = 1.5;
+  base.position.y = 1.3;
   base.castShadow = true; base.receiveShadow = true;
   g.add(base);
 
-  let y = 3.0;
-  const tiers = [
-    { w: 10.0, h: 2.6 },
-    { w: 7.6, h: 2.3 },
-    { w: 5.2, h: 2.0 },
+  // A castle roof: a wide FLAT-TOPPED frustum (trapezoid, no pointy apex) with
+  // an overhanging eave lip. Returns the y of its flat top.
+  function roof(wallW, baseY) {
+    const eaveW = wallW + 2.6;        // overhang past the wall
+    const topW = wallW * 0.62;        // flat top (where the next tier sits)
+    const rh = wallW * 0.36;          // roof height (kept modest)
+    // thin eave lip sticking out at the bottom of the roof
+    const lip = new THREE.Mesh(new THREE.BoxGeometry(eaveW + 0.7, 0.32, eaveW + 0.7), roofEdge);
+    lip.position.y = baseY + 0.16; lip.castShadow = true; g.add(lip);
+    // flat-topped pyramid (frustum)
+    const bottomR = (eaveW / 2) * Math.SQRT2;
+    const topR = (topW / 2) * Math.SQRT2;
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(topR, bottomR, rh, 4), roofMat);
+    body.rotation.y = Math.PI / 4;
+    body.position.y = baseY + 0.32 + rh / 2; body.castShadow = true; g.add(body);
+    return { topY: baseY + 0.32 + rh, topW };
+  }
+
+  let y = 2.6;
+  const walls = [
+    { w: 10.0, h: 2.7 },
+    { w: 6.6, h: 2.3 },
+    { w: 4.4, h: 2.0 },
   ];
-  tiers.forEach((t, i) => {
-    const isTop = i === tiers.length - 1;
-    // white wall
-    const w = new THREE.Mesh(new THREE.BoxGeometry(t.w, t.h, t.w), wall);
-    w.position.y = y + t.h / 2; w.castShadow = true; g.add(w);
-    // a thin dark window row near the top of the wall
-    const band = new THREE.Mesh(new THREE.BoxGeometry(t.w + 0.06, 0.55, t.w + 0.06), roofEdge);
+  walls.forEach((t, i) => {
+    const isTop = i === walls.length - 1;
+    // white wall block
+    const wm = new THREE.Mesh(new THREE.BoxGeometry(t.w, t.h, t.w), wall);
+    wm.position.y = y + t.h / 2; wm.castShadow = true; g.add(wm);
+    // dark window row + a white frame line under it
+    const band = new THREE.Mesh(new THREE.BoxGeometry(t.w + 0.06, 0.5, t.w + 0.06), roofEdge);
     band.position.y = y + t.h - 0.55; g.add(band);
     y += t.h;
 
-    // --- roof: wide shallow hip roof with a big eave overhang ---
-    const over = 1.3;
-    const ew = t.w + over * 2;          // eave footprint width
-    const rh = ew * 0.17;               // shallow pitch
-    const eave = new THREE.Mesh(new THREE.BoxGeometry(ew, 0.4, ew), roofEdge);
-    eave.position.y = y + 0.2; eave.castShadow = true; g.add(eave);
-    const R = (ew / 2) * Math.SQRT2;    // circumradius so flat faces align with eave
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(R, rh, 4), roofMat);
-    roof.rotation.y = Math.PI / 4;
-    roof.position.y = y + 0.4 + rh / 2; roof.castShadow = true; g.add(roof);
-    // chidori-hafu gable on the front slope (not on the top tier)
-    if (!isTop) {
-      const gw = t.w * 0.55, gh = rh * 0.95;
-      const gb = gable(gw, gh, 0.5);
-      gb.position.set(-gw / 2, y + 0.4, ew / 2 - 1.05);
-      g.add(gb);
-    }
-    y += 0.4 + rh + 0.05;
-  });
+    const r = roof(t.w, y);
+    y = r.topY;
 
-  // golden shachihoko (mythical fish) flanking the top ridge + finial
-  for (const sx of [-1, 1]) {
-    const fish = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.8, 4), gold);
-    fish.rotation.y = Math.PI / 4;
-    fish.rotation.z = sx * 0.35;
-    fish.position.set(sx * 1.1, y - 0.5, 0);
-    g.add(fish);
-  }
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.8, 8), gold);
-  pole.position.y = y + 0.3; g.add(pole);
-  const orb = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 10), gold);
-  orb.position.y = y + 0.8; g.add(orb);
+    if (isTop) {
+      // horizontal ridge beam on the flat top (reads as a building, not a cone)
+      const ridge = new THREE.Mesh(new THREE.BoxGeometry(r.topW + 0.5, 0.45, 1.1), roofEdge);
+      ridge.position.y = y + 0.22; ridge.castShadow = true; g.add(ridge);
+      // golden shachihoko (mythical fish ornaments) at each ridge end
+      for (const sx of [-1, 1]) {
+        const fish = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.85, 4), gold);
+        fish.rotation.y = Math.PI / 4;
+        fish.rotation.z = sx * 0.4;
+        fish.position.set(sx * (r.topW / 2 + 0.1), y + 0.55, 0);
+        g.add(fish);
+      }
+      y += 0.45;
+    }
+  });
   return g;
 }
 const castle = makeCastle();
@@ -162,20 +158,27 @@ const CASTLE_RADIUS = 12; // keep the car from driving through it
 function makeMountain({ radius, height, color }) {
   const m = new THREE.Group();
   const rock = new THREE.MeshStandardMaterial({ color, roughness: 1, flatShading: true, fog: false });
-  const snow = new THREE.MeshStandardMaterial({ color: '#f4f7fb', roughness: 1, flatShading: true, fog: false });
-  const cone = new THREE.Mesh(new THREE.ConeGeometry(radius, height, 7), rock);
+  // Snow cap uses a different slope + polygonOffset so its faces are never
+  // coplanar with the rock cone (which was causing the top to flicker).
+  const snow = new THREE.MeshStandardMaterial({
+    color: '#f4f7fb', roughness: 1, flatShading: true, fog: false,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+  });
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(radius, height, 8), rock);
   cone.position.y = height / 2; m.add(cone);
-  const cap = new THREE.Mesh(new THREE.ConeGeometry(radius * 0.42, height * 0.42, 7), snow);
-  cap.position.y = height - height * 0.21; m.add(cap);
+  // wider, shorter cap → shallower slope than the rock, sits proud near the top
+  const capH = height * 0.5;
+  const cap = new THREE.Mesh(new THREE.ConeGeometry(radius * 0.56, capH, 8), snow);
+  cap.position.y = height - capH / 2; m.add(cap);
   return m;
 }
-// Mount Fuji — broad, iconic, back-left
+// Mount Fuji — broad, iconic, back-left (sunk a little so it rises from the horizon)
 const fuji = makeMountain({ radius: 95, height: 80, color: '#6f8198' });
-fuji.position.set(-205, 0, -205);
+fuji.position.set(-205, -7, -205);
 scene.add(fuji);
 // Mount Yotei (Ezo-Fuji) — back-right
 const yotei = makeMountain({ radius: 80, height: 72, color: '#74899c' });
-yotei.position.set(215, 0, -185);
+yotei.position.set(215, -7, -185);
 scene.add(yotei);
 
 // ---------------------------------------------------------------------------
@@ -370,6 +373,40 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
+// Small wooden Japanese hut (minka): wood walls + wide thatched hip roof.
+function makeHut() {
+  const g = new THREE.Group();
+  const woodMat = new THREE.MeshStandardMaterial({ color: '#6b4a33', roughness: 1 });
+  const beamMat = new THREE.MeshStandardMaterial({ color: '#4a3322', roughness: 1 });
+  const thatch = new THREE.MeshStandardMaterial({ color: '#8a7350', roughness: 1, flatShading: true });
+  const dark = new THREE.MeshStandardMaterial({ color: '#2a2018', roughness: 1 });
+
+  const walls = new THREE.Mesh(new THREE.BoxGeometry(2.8, 1.5, 2.4), woodMat);
+  walls.position.y = 0.75; walls.castShadow = true; g.add(walls);
+  // corner beams
+  for (const [sx, sz] of [[-1.4, 1.2], [1.4, 1.2], [-1.4, -1.2], [1.4, -1.2]]) {
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.5, 0.18), beamMat);
+    beam.position.set(sx, 0.75, sz); g.add(beam);
+  }
+  // wide thatched hip roof (flat-topped frustum + eave lip)
+  const eaveW = 4.2;
+  const lip = new THREE.Mesh(new THREE.BoxGeometry(eaveW, 0.22, eaveW), thatch);
+  lip.position.y = 1.6; lip.castShadow = true; g.add(lip);
+  const bottomR = (eaveW / 2) * Math.SQRT2;
+  const topR = 0.5 * Math.SQRT2;
+  const roof = new THREE.Mesh(new THREE.CylinderGeometry(topR, bottomR, 1.5, 4), thatch);
+  roof.rotation.y = Math.PI / 4; roof.position.y = 2.4; roof.castShadow = true; g.add(roof);
+  // ridge beam on top
+  const ridge = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.22, 0.3), beamMat);
+  ridge.position.y = 3.15; g.add(ridge);
+  // doorway + window
+  const door = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.0, 0.06), dark);
+  door.position.set(0, 0.5, 1.21); g.add(door);
+  const win = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.06), dark);
+  win.position.set(-1.0, 0.85, 1.21); g.add(win);
+  return g;
+}
+
 ZONES.forEach((zone) => {
   const gate = makeTorii(zone.color);
   gate.position.set(zone.x, 0, zone.z);
@@ -382,6 +419,22 @@ ZONES.forEach((zone) => {
   const label = makeLabel(zone.title);
   label.position.set(zone.x, 8.5, zone.z);
   scene.add(label);
+
+  // A small village: two huts flanking each gate, set back and facing center.
+  const len = Math.hypot(zone.x, zone.z) || 1;
+  const ux = zone.x / len, uz = zone.z / len;   // outward from center
+  const tx = -uz, tz = ux;                       // tangent
+  for (const side of [-1, 1]) {
+    const hut = makeHut();
+    hut.position.set(
+      zone.x + tx * 7 * side + ux * 2.5,
+      0,
+      zone.z + tz * 7 * side + uz * 2.5
+    );
+    hut.lookAt(0, 1, 0);
+    hut.rotation.y += (Math.random() - 0.5) * 0.3;
+    scene.add(hut);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -526,7 +579,7 @@ const carState = { x: 0, z: 30, heading: Math.PI, speed: 0 };
 
 // Dev-only inspection hook (stripped from production builds)
 if (import.meta.env && import.meta.env.DEV) {
-  window.__game = { scene, camera, car, carState };
+  window.__game = { scene, camera, car, carState, renderer };
 }
 
 // ---------------------------------------------------------------------------
