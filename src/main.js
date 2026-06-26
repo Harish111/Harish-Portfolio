@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { ZONES } from './content.js';
+import { toggleAudio } from './audio.js';
 
 // ---------------------------------------------------------------------------
 // Renderer / scene / camera
@@ -239,41 +240,95 @@ ZONES.forEach((zone) => {
 });
 
 // ---------------------------------------------------------------------------
-// Car (boxes) + arcade driving
+// Car — stylized white Land Rover Defender + arcade driving
+// Front of the vehicle faces +z (direction of travel).
 // ---------------------------------------------------------------------------
 function makeCar() {
   const g = new THREE.Group();
-  const body = new THREE.Mesh(
-    new THREE.BoxGeometry(1.8, 0.6, 3.4),
-    new THREE.MeshStandardMaterial({ color: '#2b2b3a', roughness: 0.5, metalness: 0.2 })
-  );
-  body.position.y = 0.7; body.castShadow = true; g.add(body);
-  const cabin = new THREE.Mesh(
-    new THREE.BoxGeometry(1.5, 0.6, 1.7),
-    new THREE.MeshStandardMaterial({ color: '#d64545', roughness: 0.4 })
-  );
-  cabin.position.set(0, 1.2, -0.2); cabin.castShadow = true; g.add(cabin);
-  // windshield
-  const glass = new THREE.Mesh(
-    new THREE.BoxGeometry(1.3, 0.45, 0.1),
-    new THREE.MeshStandardMaterial({ color: '#9fd3e0', roughness: 0.1, metalness: 0.3 })
-  );
-  glass.position.set(0, 1.25, 0.65); g.add(glass);
+  const white = new THREE.MeshStandardMaterial({ color: '#eef0ec', roughness: 0.55, metalness: 0.05 });
+  const black = new THREE.MeshStandardMaterial({ color: '#1c1c1e', roughness: 0.75 });
+  const glassMat = new THREE.MeshStandardMaterial({ color: '#33474a', roughness: 0.15, metalness: 0.5 });
+  const chrome = new THREE.MeshStandardMaterial({ color: '#cfcfcf', roughness: 0.3, metalness: 0.6 });
 
-  const wheelGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.35, 12);
-  const wheelMat = new THREE.MeshStandardMaterial({ color: '#1a1a1a', roughness: 0.9 });
+  // Lower chassis / sills
+  const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.45, 3.5), black);
+  chassis.position.y = 0.6; chassis.castShadow = true; g.add(chassis);
+
+  // Main body (boxy, white)
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.8, 3.5), white);
+  body.position.y = 1.1; body.castShadow = true; g.add(body);
+
+  // Greenhouse: tinted window band, with a white cabin shell around it
+  const greenhouse = new THREE.Mesh(new THREE.BoxGeometry(1.86, 0.55, 1.9), glassMat);
+  greenhouse.position.set(0, 1.8, -0.1); g.add(greenhouse);
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.82, 0.72, 1.85), white);
+  cabin.position.set(0, 1.82, -0.12); cabin.castShadow = true;
+  cabin.renderOrder = 0; g.add(cabin);
+  // pillars: thin white verticals so the glass reads as separate windows
+  for (const [sx, sz] of [[-0.92, 0.85], [0.92, 0.85], [-0.92, -0.95], [0.92, -0.95]]) {
+    const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.6, 0.12), white);
+    pillar.position.set(sx, 1.8, sz); g.add(pillar);
+  }
+
+  // Flat "Alpine" roof + roof rack (signature Defender)
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(1.86, 0.14, 2.1), white);
+  roof.position.set(0, 2.2, -0.12); roof.castShadow = true; g.add(roof);
+  const rack = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.08, 1.85), black);
+  rack.position.set(0, 2.33, -0.12); rack.castShadow = true; g.add(rack);
+  for (const sx of [-0.78, 0, 0.78]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.13, 1.85), black);
+    rail.position.set(sx, 2.34, -0.12); g.add(rail);
+  }
+
+  // Front: grille + round headlights + bumper
+  const grille = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.5, 0.08), black);
+  grille.position.set(0, 1.1, 1.76); g.add(grille);
+  const headGeo = new THREE.CylinderGeometry(0.17, 0.17, 0.1, 16);
+  for (const sx of [-0.58, 0.58]) {
+    const ring = new THREE.Mesh(headGeo, chrome);
+    ring.rotation.x = Math.PI / 2; ring.position.set(sx, 1.1, 1.79); g.add(ring);
+    const bulb = new THREE.Mesh(
+      new THREE.CircleGeometry(0.12, 16),
+      new THREE.MeshStandardMaterial({ color: '#fff6da', emissive: '#ffdf9e', emissiveIntensity: 0.6 })
+    );
+    bulb.position.set(sx, 1.1, 1.85); g.add(bulb);
+  }
+  const bumper = new THREE.Mesh(new THREE.BoxGeometry(1.95, 0.22, 0.22), black);
+  bumper.position.set(0, 0.72, 1.78); bumper.castShadow = true; g.add(bumper);
+
+  // Rear: spare wheel mounted on the back door
+  const spare = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.26, 18), black);
+  spare.rotation.x = Math.PI / 2; spare.position.set(0.32, 1.15, -1.86);
+  spare.castShadow = true; g.add(spare);
+  const spareHub = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.28, 12), chrome);
+  spareHub.rotation.x = Math.PI / 2; spareHub.position.set(0.32, 1.15, -1.87); g.add(spareHub);
+
+  // Black wheel arches
+  for (const sz of [1.15, -1.15]) {
+    for (const sx of [-0.97, 0.97]) {
+      const arch = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.5, 1.0), black);
+      arch.position.set(sx, 0.85, sz); g.add(arch);
+    }
+  }
+
+  // Chunky off-road wheels (each a group so it can roll)
+  const tyre = new THREE.MeshStandardMaterial({ color: '#141414', roughness: 0.95 });
+  const wheelGeo = new THREE.CylinderGeometry(0.52, 0.52, 0.42, 18);
+  const hubGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.44, 8);
   const wheels = [];
   const offs = [
-    [-0.95, 0.42, 1.1], [0.95, 0.42, 1.1],
-    [-0.95, 0.42, -1.1], [0.95, 0.42, -1.1],
+    [-1.0, 0.52, 1.15], [1.0, 0.52, 1.15],
+    [-1.0, 0.52, -1.15], [1.0, 0.52, -1.15],
   ];
   offs.forEach((o) => {
-    const w = new THREE.Mesh(wheelGeo, wheelMat);
-    w.rotation.z = Math.PI / 2;
-    w.position.set(...o);
-    w.castShadow = true;
-    g.add(w);
-    wheels.push(w);
+    const wheel = new THREE.Group();
+    const tire = new THREE.Mesh(wheelGeo, tyre);
+    tire.rotation.z = Math.PI / 2; tire.castShadow = true; wheel.add(tire);
+    const hub = new THREE.Mesh(hubGeo, chrome);
+    hub.rotation.z = Math.PI / 2; wheel.add(hub);
+    wheel.position.set(...o);
+    g.add(wheel);
+    wheels.push(wheel);
   });
   g.userData.wheels = wheels;
   return g;
@@ -332,6 +387,16 @@ function openZone(zone) {
   panelContent.innerHTML = zone.html;
   panelEl.classList.remove('hidden');
 }
+
+// ---------------------------------------------------------------------------
+// Music toggle (starts on click — required by browser autoplay policy)
+// ---------------------------------------------------------------------------
+const soundBtn = document.getElementById('sound-btn');
+soundBtn.addEventListener('click', () => {
+  const on = toggleAudio();
+  soundBtn.textContent = on ? '🔊 Music' : '🔈 Music';
+  soundBtn.classList.toggle('on', on);
+});
 
 // ---------------------------------------------------------------------------
 // Driving physics + loop

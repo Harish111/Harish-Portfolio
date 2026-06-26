@@ -81,6 +81,29 @@ html, body {
   white-space: nowrap;
 }
 
+/* ---------- Music toggle ---------- */
+#sound-btn {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 20;
+  background: rgba(247, 239, 226, 0.85);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(43, 26, 18, 0.15);
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+#sound-btn:hover { background: var(--paper); }
+#sound-btn.on {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
 /* ---------- Content panel ---------- */
 #panel {
   position: fixed;
