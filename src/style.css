@@ -1,0 +1,177 @@
+:root {
+  --ink: #2b1a12;
+  --paper: #f7efe2;
+  --accent: #d64545;
+  --accent-2: #e8943a;
+  --gold: #e8b13a;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #e9c08a;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: var(--ink);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#scene {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ---------- Loading overlay ---------- */
+#loading {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #f3d9a8 0%, #e89f5b 55%, #c75c44 100%);
+  transition: opacity 0.8s ease;
+}
+#loading.gone { opacity: 0; pointer-events: none; }
+.loading-inner { text-align: center; }
+.loading-inner h1 {
+  font-size: clamp(2rem, 6vw, 3.5rem);
+  letter-spacing: 1px;
+  color: var(--ink);
+}
+.loading-tag { margin: 10px 0 22px; color: #6b4a33; font-size: 1rem; }
+.loading-bar {
+  width: min(280px, 70vw);
+  height: 6px;
+  border-radius: 6px;
+  background: rgba(43, 26, 18, 0.18);
+  overflow: hidden;
+  margin: 0 auto;
+}
+.loading-fill {
+  width: 0%;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.25s ease;
+}
+
+/* ---------- HUD ---------- */
+#hud {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 20;
+  pointer-events: none;
+}
+.hud-help {
+  background: rgba(247, 239, 226, 0.85);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(43, 26, 18, 0.15);
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-size: 0.85rem;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* ---------- Content panel ---------- */
+#panel {
+  position: fixed;
+  top: 50%;
+  right: 30px;
+  transform: translateY(-50%) translateX(0);
+  z-index: 30;
+  width: min(380px, 88vw);
+  max-height: 80vh;
+  overflow-y: auto;
+  background: var(--paper);
+  border: 1px solid rgba(43, 26, 18, 0.15);
+  border-top: 5px solid var(--accent);
+  border-radius: 12px;
+  box-shadow: 0 24px 60px rgba(43, 26, 18, 0.35);
+  padding: 28px 26px;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+#panel.hidden {
+  opacity: 0;
+  transform: translateY(-50%) translateX(30px);
+  pointer-events: none;
+}
+#panel-close {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  background: none;
+  border: none;
+  font-size: 1.6rem;
+  line-height: 1;
+  color: #9a7a63;
+  cursor: pointer;
+}
+#panel-close:hover { color: var(--accent); }
+#panel-content h2 {
+  font-size: 1.5rem;
+  margin-bottom: 4px;
+  color: var(--accent);
+}
+#panel-content .kicker {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--accent-2);
+  margin-bottom: 14px;
+}
+#panel-content p { line-height: 1.7; margin-bottom: 12px; font-size: 0.95rem; }
+#panel-content a { color: var(--accent); font-weight: 600; text-decoration: none; }
+#panel-content a:hover { text-decoration: underline; }
+#panel-content ul { margin: 0 0 12px 18px; line-height: 1.7; font-size: 0.95rem; }
+.soon {
+  display: inline-block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  background: var(--gold);
+  color: var(--ink);
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+/* ---------- Touch controls ---------- */
+#touch {
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.touch-row { display: flex; gap: 8px; }
+.tbtn {
+  width: 58px;
+  height: 58px;
+  border-radius: 14px;
+  border: 1px solid rgba(43, 26, 18, 0.2);
+  background: rgba(247, 239, 226, 0.85);
+  color: var(--ink);
+  font-size: 1.2rem;
+  touch-action: none;
+}
+.tbtn:active { background: var(--accent); color: #fff; }
+
+.hidden { display: none !important; }
+
+/* Hide keyboard hint on touch devices */
+@media (hover: none) and (pointer: coarse) {
+  .hud-help { display: none; }
+}

@@ -1,64 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Harish Gurram | Portfolio</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #fff;
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .container {
-            text-align: center;
-            padding: 40px;
-        }
-        h1 {
-            font-size: 4rem;
-            margin-bottom: 20px;
-            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        .tagline {
-            font-size: 1.5rem;
-            color: #a0a0a0;
-            margin-bottom: 30px;
-        }
-        .info {
-            font-size: 1.1rem;
-            line-height: 2;
-            color: #d0d0d0;
-        }
-        .info a {
-            color: #00d4ff;
-            text-decoration: none;
-        }
-        .info a:hover {
-            text-decoration: underline;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Harish Gurram | Portfolio</title>
+  <meta name="description" content="Harish Gurram — Software Developer. Drive around an interactive low-poly Japan to explore my work." />
+  <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
-    <div class="container">
-            <h1>Harish Gurram</h1>
-        <p class="tagline">Software Developer</p>
-        <div class="info">
-            <p>📍 India</p>
-            <p>📧 gurramharish275@gmail.com</p>
-            <p>💻 <a href="https://github.com/Harish111" target="_blank">GitHub</a></p>
-        </div>
+  <!-- Loading overlay -->
+  <div id="loading">
+    <div class="loading-inner">
+      <h1>Harish&nbsp;Gurram</h1>
+      <p class="loading-tag">Loading the world…</p>
+      <div class="loading-bar"><div class="loading-fill"></div></div>
     </div>
+  </div>
+
+  <!-- Intro / controls hint -->
+  <div id="hud">
+    <div class="hud-help">
+      <strong>Drive:</strong> W A S D · <strong>or</strong> Arrow keys
+    </div>
+  </div>
+
+  <!-- Content panel (shown when you reach a zone) -->
+  <div id="panel" class="hidden">
+    <button id="panel-close" aria-label="Close">×</button>
+    <div id="panel-content"></div>
+  </div>
+
+  <!-- On-screen touch controls (mobile) -->
+  <div id="touch" class="hidden">
+    <div class="touch-row">
+      <button class="tbtn" data-key="up">▲</button>
+    </div>
+    <div class="touch-row">
+      <button class="tbtn" data-key="left">◀</button>
+      <button class="tbtn" data-key="down">▼</button>
+      <button class="tbtn" data-key="right">▶</button>
+    </div>
+  </div>
+
+  <canvas id="scene"></canvas>
+
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>
