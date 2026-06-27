@@ -104,6 +104,21 @@ html, body {
   border-color: var(--accent);
 }
 
+/* ---------- Music attribution credit ---------- */
+#credit {
+  position: fixed;
+  left: 14px;
+  bottom: 12px;
+  z-index: 20;
+  font-size: 0.72rem;
+  color: rgba(43, 26, 18, 0.6);
+  background: rgba(247, 239, 226, 0.7);
+  padding: 4px 10px;
+  border-radius: 999px;
+  backdrop-filter: blur(3px);
+}
+#credit a { color: rgba(43, 26, 18, 0.8); }
+
 /* ---------- Content panel ---------- */
 #panel {
   position: fixed;

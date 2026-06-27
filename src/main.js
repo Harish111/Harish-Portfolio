@@ -635,10 +635,12 @@ function openZone(zone) {
 // Music toggle (starts on click — required by browser autoplay policy)
 // ---------------------------------------------------------------------------
 const soundBtn = document.getElementById('sound-btn');
+const creditEl = document.getElementById('credit');
 soundBtn.addEventListener('click', () => {
   const on = toggleAudio();
   soundBtn.textContent = on ? '🔊 Music' : '🔈 Music';
   soundBtn.classList.toggle('on', on);
+  creditEl.classList.toggle('hidden', !on);
 });
 
 // ---------------------------------------------------------------------------

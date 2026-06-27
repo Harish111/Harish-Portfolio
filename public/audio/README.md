@@ -1,13 +1,23 @@
 # Background music
 
-Drop a **royalty-free / properly licensed** track here named exactly:
+`music.mp3` is played (looping) on the site when the visitor turns music on.
+If this file is absent, the site falls back to a built-in procedural score.
 
-    music.mp3
+## Current track & attribution (REQUIRED — CC BY)
 
-When this file exists, the site plays it (looping) instead of the built-in
-procedural score. No code changes needed — just add the file and push.
+**"Ishikari Lore"** by **Kevin MacLeod** (https://incompetech.com/)
+Licensed under **Creative Commons: Attribution 4.0** —
+https://creativecommons.org/licenses/by/4.0/
 
-Do NOT use the actual Ghost of Tsushima / Ghost of Yotei soundtrack here — it
-is copyrighted and cannot be hosted on a public site. Use a royalty-free
-Japanese/cinematic track (e.g. from Pixabay Music, the Free Music Archive, or
-a track you have a license for).
+The credit is shown on-site (bottom-left) while the track plays. Keep that
+credit visible — it's a condition of the license.
+
+## Swapping the track
+
+Replace `music.mp3` with another **royalty-free / properly licensed** file of
+the same name and push. If the new track requires attribution, update the
+credit in `index.html` (the `#credit` element) and this file.
+
+Do NOT use the Ghost of Tsushima / Ghost of Yotei soundtrack — it is
+copyrighted and cannot be hosted here. Good no-attribution sources include
+Pixabay Music and the Free Music Archive (check each track's license).

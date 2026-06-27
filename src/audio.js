@@ -17,18 +17,18 @@ const timers = [];
 // If a licensed track exists at public/audio/music.mp3 it is used instead of
 // the procedural score below. Drop a royalty-free file there and it just works.
 const FILE_URL = import.meta.env.BASE_URL + 'audio/music.mp3';
-let fileEl = null; // HTMLAudioElement once confirmed present
+let fileEl = null; // HTMLAudioElement once the file is confirmed loadable
 (function probeFile() {
-  fetch(FILE_URL, { method: 'HEAD' })
-    .then((r) => {
-      if (r.ok) {
-        fileEl = new Audio(FILE_URL);
-        fileEl.loop = true;
-        fileEl.preload = 'auto';
-        fileEl.volume = 0.55;
-      }
-    })
-    .catch(() => { /* no file: fall back to procedural */ });
+  const el = new Audio();
+  el.preload = 'metadata';
+  el.src = FILE_URL;
+  el.addEventListener('loadedmetadata', () => {
+    el.loop = true;
+    el.volume = 0.55;
+    fileEl = el;
+  }, { once: true });
+  // On a missing file the element errors → keep procedural fallback.
+  el.addEventListener('error', () => {}, { once: true });
 })();
 
 // D Kumoi scale across two octaves (Hz): D E F A B
