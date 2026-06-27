@@ -87,12 +87,65 @@ function makeCastle() {
   const roofEdge = new THREE.MeshStandardMaterial({ color: '#262f38', roughness: 0.8, flatShading: true });
   const gold = new THREE.MeshStandardMaterial({ color: '#d9a93a', metalness: 0.45, roughness: 0.35 });
 
+  const railMat = new THREE.MeshStandardMaterial({ color: '#5b3a24', roughness: 1 });
+  const doorMat = new THREE.MeshStandardMaterial({ color: '#1c140e', roughness: 1 });
+
   // Sloped stone base (4-sided frustum), kept low so the tower dominates.
   const base = new THREE.Mesh(new THREE.CylinderGeometry(7.0, 9.0, 2.6, 4), stone);
   base.rotation.y = Math.PI / 4;
   base.position.y = 1.3;
   base.castShadow = true; base.receiveShadow = true;
   g.add(base);
+
+  // --- Veranda (engawa) corridor ringing the first tier, with a railing ---
+  const verandaY = 2.6;
+  const vHalf = 6.4;
+  const veranda = new THREE.Mesh(new THREE.BoxGeometry(vHalf * 2, 0.25, vHalf * 2), stone);
+  veranda.position.y = verandaY + 0.12; veranda.receiveShadow = true; veranda.castShadow = true;
+  g.add(veranda);
+  const postGeo = new THREE.BoxGeometry(0.16, 0.7, 0.16);
+  for (let t = -vHalf + 0.4; t <= vHalf - 0.4; t += 1.0) {
+    for (const [px, pz] of [[t, vHalf], [t, -vHalf], [vHalf, t], [-vHalf, t]]) {
+      const post = new THREE.Mesh(postGeo, railMat);
+      post.position.set(px, verandaY + 0.5, pz); g.add(post);
+    }
+  }
+  for (const [rx, rz, rw, rd] of [
+    [0, vHalf, vHalf * 2, 0.12], [0, -vHalf, vHalf * 2, 0.12],
+    [vHalf, 0, 0.12, vHalf * 2], [-vHalf, 0, 0.12, vHalf * 2],
+  ]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(rw, 0.1, rd), railMat);
+    rail.position.set(rx, verandaY + 0.85, rz); g.add(rail);
+  }
+
+  // --- Four stone staircases up to the veranda, one per side ---
+  function makeStairs() {
+    const s = new THREE.Group();
+    const n = 5, depth = 0.7, width = 3.6;
+    for (let i = 0; i < n; i++) {
+      const h = verandaY * (i + 1) / n;
+      const step = new THREE.Mesh(new THREE.BoxGeometry(width, verandaY / n, depth), stone);
+      step.position.set(0, h - verandaY / (2 * n), vHalf + (n - i) * depth - depth / 2);
+      step.castShadow = true; step.receiveShadow = true; s.add(step);
+    }
+    return s;
+  }
+  for (let k = 0; k < 4; k++) {
+    const st = makeStairs();
+    st.rotation.y = k * Math.PI / 2;
+    g.add(st);
+  }
+
+  // --- Four entrances (dark doorways) in the first-tier wall ---
+  for (let k = 0; k < 4; k++) {
+    const grp = new THREE.Group();
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(2.0, 2.3, 0.3), railMat);
+    frame.position.set(0, verandaY + 1.15, 5.0); grp.add(frame);
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.9, 0.36), doorMat);
+    door.position.set(0, verandaY + 0.95, 5.02); grp.add(door);
+    grp.rotation.y = k * Math.PI / 2;
+    g.add(grp);
+  }
 
   // A castle roof: a wide FLAT-TOPPED frustum (trapezoid, no pointy apex) with
   // an overhanging eave lip. Returns the y of its flat top.
@@ -465,6 +518,61 @@ ZONES.forEach((zone) => {
 });
 
 // ---------------------------------------------------------------------------
+// A small farmed plot — a fenced rice paddy with rows of crops + a scarecrow.
+// ---------------------------------------------------------------------------
+function makeFarm() {
+  const g = new THREE.Group();
+  const soil = new THREE.MeshStandardMaterial({ color: '#6e4a2a', roughness: 1 });
+  const paddy = new THREE.MeshStandardMaterial({ color: '#5f7d49', roughness: 0.7 });
+  const cropMat = new THREE.MeshStandardMaterial({ color: '#7cae3a', roughness: 1, flatShading: true });
+  const woodMat = new THREE.MeshStandardMaterial({ color: '#6b4a33', roughness: 1 });
+  const W = 16, D = 12;
+
+  const plot = new THREE.Mesh(new THREE.BoxGeometry(W, 0.3, D), soil);
+  plot.position.y = 0.15; plot.receiveShadow = true; g.add(plot);
+  const pad = new THREE.Mesh(new THREE.BoxGeometry(W - 1.4, 0.12, D - 1.4), paddy);
+  pad.position.y = 0.32; g.add(pad);
+
+  // rows of crops
+  for (let rx = -W / 2 + 1.6; rx <= W / 2 - 1.6; rx += 1.4) {
+    for (let rz = -D / 2 + 1.4; rz <= D / 2 - 1.4; rz += 1.2) {
+      const crop = new THREE.Mesh(new THREE.ConeGeometry(0.18, rand(0.5, 0.8), 5), cropMat);
+      crop.position.set(rx + rand(-0.12, 0.12), 0.6, rz + rand(-0.12, 0.12));
+      crop.castShadow = true; g.add(crop);
+    }
+  }
+
+  // fence posts + rails around the plot (also returned as colliders below)
+  const postGeo = new THREE.BoxGeometry(0.16, 0.9, 0.16);
+  const fencePts = [];
+  for (let fx = -W / 2; fx <= W / 2; fx += 2) { fencePts.push([fx, -D / 2]); fencePts.push([fx, D / 2]); }
+  for (let fz = -D / 2 + 2; fz <= D / 2 - 2; fz += 2) { fencePts.push([-W / 2, fz]); fencePts.push([W / 2, fz]); }
+  for (const [fx, fz] of fencePts) {
+    const post = new THREE.Mesh(postGeo, woodMat);
+    post.position.set(fx, 0.45, fz); post.castShadow = true; g.add(post);
+  }
+
+  // scarecrow
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.7, 6), woodMat);
+  pole.position.set(0, 0.85, 0); g.add(pole);
+  const arms = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.1, 0.1), woodMat);
+  arms.position.set(0, 1.25, 0); g.add(arms);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), new THREE.MeshStandardMaterial({ color: '#d8c89a' }));
+  head.position.set(0, 1.75, 0); g.add(head);
+
+  g.userData.fencePts = fencePts;
+  return g;
+}
+const farm = makeFarm();
+const FARM_X = -64, FARM_Z = 58;
+farm.position.set(FARM_X, 0, FARM_Z);
+scene.add(farm);
+// fence colliders so the car drives around the plot, not through the crops
+for (const [fx, fz] of farm.userData.fencePts) {
+  colliders.push({ x: FARM_X + fx, z: FARM_Z + fz, r: 0.5 });
+}
+
+// ---------------------------------------------------------------------------
 // Car — stylized white Land Rover Defender + arcade driving
 // Front of the vehicle faces +z (direction of travel).
 // ---------------------------------------------------------------------------
@@ -589,8 +697,44 @@ function makeCar() {
 
   // --- Wheels: front wheels steer (pivot.rotation.y), all wheels roll ---
   const tyre = new THREE.MeshStandardMaterial({ color: '#131313', roughness: 0.95 });
+  const treadMat = new THREE.MeshStandardMaterial({ color: '#070707', roughness: 1 });
   const wheelGeo = new THREE.CylinderGeometry(0.56, 0.56, 0.46, 20);
-  const hubGeo = new THREE.CylinderGeometry(0.23, 0.23, 0.48, 10);
+  const hubGeo = new THREE.CylinderGeometry(0.23, 0.23, 0.5, 10);
+  const boltGeo = new THREE.CylinderGeometry(0.045, 0.045, 0.06, 6);
+  const lugGeo = new THREE.BoxGeometry(0.46, 0.1, 0.14);
+
+  // A wheel whose detail (tread blocks + lug bolts + a spoke) makes its
+  // rotation clearly visible when it rolls.
+  function buildWheel() {
+    const roll = new THREE.Group();
+    const tire = new THREE.Mesh(wheelGeo, tyre);
+    tire.rotation.z = Math.PI / 2; tire.castShadow = true; roll.add(tire);
+    const hub = new THREE.Mesh(hubGeo, chrome);
+    hub.rotation.z = Math.PI / 2; roll.add(hub);
+    // a bright spoke across the hub — a strong visual spin cue
+    const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.34, 0.06), trim);
+    roll.add(spoke);
+    // lug bolts on both faces
+    for (const fx of [-0.25, 0.25]) {
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        const bolt = new THREE.Mesh(boltGeo, black);
+        bolt.rotation.z = Math.PI / 2;
+        bolt.position.set(fx, Math.sin(a) * 0.13, Math.cos(a) * 0.13);
+        roll.add(bolt);
+      }
+    }
+    // tread blocks around the circumference
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      const lug = new THREE.Mesh(lugGeo, treadMat);
+      lug.position.set(0, Math.sin(a) * 0.57, Math.cos(a) * 0.57);
+      lug.rotation.x = -a;
+      roll.add(lug);
+    }
+    return roll;
+  }
+
   const rollWheels = [];
   const steerWheels = [];
   const offs = [
@@ -600,11 +744,7 @@ function makeCar() {
   offs.forEach((o) => {
     const pivot = new THREE.Group();        // steers (yaw) for front wheels
     pivot.position.set(o.x, 0.56, o.z);
-    const roll = new THREE.Group();          // spins (rolls)
-    const tire = new THREE.Mesh(wheelGeo, tyre);
-    tire.rotation.z = Math.PI / 2; tire.castShadow = true; roll.add(tire);
-    const hub = new THREE.Mesh(hubGeo, chrome);
-    hub.rotation.z = Math.PI / 2; roll.add(hub);
+    const roll = buildWheel();               // spins (rolls)
     pivot.add(roll);
     g.add(pivot);
     rollWheels.push(roll);
@@ -618,7 +758,10 @@ function makeCar() {
 const car = makeCar();
 scene.add(car);
 
-const carState = { x: 0, z: 30, heading: Math.PI, speed: 0 };
+// carState.y / vy drive the intro "drop from the sky" landing animation.
+const carState = { x: 0, z: 30, heading: Math.PI, speed: 0, y: 26, vy: 0 };
+let intro = true;
+const GRAVITY = 0.05;
 
 // Dev-only inspection hook (stripped from production builds)
 if (import.meta.env && import.meta.env.DEV) {
@@ -725,6 +868,29 @@ function update() {
   const dt = Math.min(clock.getDelta(), 0.05);
   const f = dt * 60; // 1.0 at 60fps
 
+  // --- intro: the car drops from the sky and bounces to a stop ---
+  if (intro) {
+    carState.vy -= GRAVITY * f;
+    carState.y += carState.vy * f;
+    if (carState.y <= 0) {
+      carState.y = 0;
+      if (Math.abs(carState.vy) > 0.18) carState.vy = -carState.vy * 0.4; // bounce
+      else { carState.vy = 0; intro = false; }
+    }
+    car.position.set(carState.x, carState.y, carState.z);
+    car.rotation.y = carState.heading;
+    if (!(import.meta.env && import.meta.env.DEV && window.__freezeCam)) {
+      const ang = carState.heading;
+      const camDist = 13, camHeight = 7;
+      const lerp = 1 - Math.pow(1 - 0.08, f);
+      camera.position.x += (carState.x - Math.sin(ang) * camDist - camera.position.x) * lerp;
+      camera.position.z += (carState.z - Math.cos(ang) * camDist - camera.position.z) * lerp;
+      camera.position.y += ((camHeight + carState.y * 0.45) - camera.position.y) * lerp;
+      camera.lookAt(carState.x, carState.y + 1.0, carState.z);
+    }
+    return; // no driving until it lands
+  }
+
   // throttle / brake / reverse
   if (keys.up) carState.speed += ACCEL * f;
   else if (keys.down) carState.speed -= ACCEL * f;
@@ -773,7 +939,7 @@ function update() {
     }
   }
 
-  car.position.set(carState.x, 0, carState.z);
+  car.position.set(carState.x, carState.y, carState.z);
   car.rotation.y = carState.heading;
 
   // spin all wheels
@@ -781,9 +947,17 @@ function update() {
   car.userData.rollWheels.forEach((w) => { w.rotation.x += spin; });
 
   // follow camera (skippable in dev for inspection). camYaw lets the player
-  // drag to look around; it eases back behind the car while driving.
+  // drag to look around; forward eases it behind, reverse swings it to the
+  // front of the car, idle holds wherever the player dragged it.
   if (!(import.meta.env && import.meta.env.DEV && window.__freezeCam)) {
-    if (keys.up || keys.down) camYaw *= Math.pow(0.93, f);
+    let camTarget = null;
+    if (keys.up) camTarget = 0;
+    else if (keys.down) camTarget = Math.PI; // reverse → look at the front
+    if (camTarget !== null) {
+      let d = camTarget - camYaw;
+      d = Math.atan2(Math.sin(d), Math.cos(d)); // shortest angular path
+      camYaw += d * Math.min(1, 0.06 * f);
+    }
     const ang = carState.heading + camYaw;
     const camDist = 12.5, camHeight = 6.2;
     const targetCamX = carState.x - Math.sin(ang) * camDist;
