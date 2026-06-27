@@ -315,30 +315,48 @@ function makeTorii(color = '#d64545') {
 // ---------------------------------------------------------------------------
 function rand(min, max) { return min + Math.random() * (max - min); }
 
-const SCATTER_COUNT = 140;
-for (let i = 0; i < SCATTER_COUNT; i++) {
+// Solid obstacles the car cannot drive through — circle colliders {x, z, r}.
+const colliders = [];
+
+// Keep an area clear around every gate so the gateway/approach isn't blocked.
+function clearOfGates(x, z, pad) {
+  for (const zone of ZONES) {
+    if (Math.hypot(x - zone.x, z - zone.z) < pad) return false;
+  }
+  return true;
+}
+
+const SCATTER_COUNT = 150;
+let placed = 0, attempts = 0;
+while (placed < SCATTER_COUNT && attempts < SCATTER_COUNT * 8) {
+  attempts++;
   const angle = Math.random() * Math.PI * 2;
   const radius = rand(34, 150);
   const x = Math.cos(angle) * radius;
   const z = Math.sin(angle) * radius;
-  let tree;
+  if (!clearOfGates(x, z, 13)) continue; // don't block gate areas
+  let tree, cr;
   const r = Math.random();
-  if (r < 0.34) tree = makeMaple(rand(0.8, 1.5));
-  else if (r < 0.64) tree = makeSakura(rand(0.85, 1.5));
-  else if (r < 0.86) tree = makePine(rand(0.9, 1.6));
-  else { tree = makeLantern(); }
+  if (r < 0.34) { tree = makeMaple(rand(0.8, 1.5)); cr = 1.1; }
+  else if (r < 0.64) { tree = makeSakura(rand(0.85, 1.5)); cr = 1.1; }
+  else if (r < 0.86) { tree = makePine(rand(0.9, 1.6)); cr = 0.9; }
+  else { tree = makeLantern(); cr = 0.7; }
   tree.position.set(x, 0, z);
   tree.rotation.y = Math.random() * Math.PI * 2;
   scene.add(tree);
+  colliders.push({ x, z, r: cr });
+  placed++;
 }
 
-// Pampas-grass field hint: scattered thin golden cones near the center ring
+// Pampas-grass field hint (decorative — car drives over these, no collider)
 const grassMat = new THREE.MeshStandardMaterial({ color: '#e8c87a', roughness: 1, flatShading: true });
-for (let i = 0; i < 200; i++) {
+for (let i = 0; i < 220; i++) {
   const angle = Math.random() * Math.PI * 2;
-  const radius = rand(28, 60);
+  const radius = rand(28, 70);
+  const x = Math.cos(angle) * radius, z = Math.sin(angle) * radius;
+  if (!clearOfGates(x, z, 12)) continue;
   const blade = new THREE.Mesh(new THREE.ConeGeometry(0.18, rand(1.2, 2.4), 4), grassMat);
-  blade.position.set(Math.cos(angle) * radius, 0.6, Math.sin(angle) * radius);
+  blade.position.set(x, 0.6, z);
   blade.rotation.set(rand(-0.2, 0.2), Math.random() * Math.PI, rand(-0.2, 0.2));
   scene.add(blade);
 }
@@ -408,32 +426,41 @@ function makeHut() {
 }
 
 ZONES.forEach((zone) => {
+  const len = Math.hypot(zone.x, zone.z) || 1;
+  const ux = zone.x / len, uz = zone.z / len;   // outward from center
+  const tx = -uz, tz = ux;                       // tangent (gate width axis)
+
   const gate = makeTorii(zone.color);
   gate.position.set(zone.x, 0, zone.z);
   gate.lookAt(0, 0, 0);
   scene.add(gate);
+  // collide with the two gate pillars (local ±2.5 along the gate's width)
+  for (const side of [-1, 1]) {
+    colliders.push({ x: zone.x + tx * 2.5 * side, z: zone.z + tz * 2.5 * side, r: 0.55 });
+  }
 
-  const l1 = makeLantern(); l1.position.set(zone.x - 3.5, 0, zone.z); scene.add(l1);
-  const l2 = makeLantern(); l2.position.set(zone.x + 3.5, 0, zone.z); scene.add(l2);
+  // lanterns flanking the gate (along the tangent so they line up with it)
+  const l1 = makeLantern();
+  l1.position.set(zone.x + tx * 3.6, 0, zone.z + tz * 3.6); scene.add(l1);
+  const l2 = makeLantern();
+  l2.position.set(zone.x - tx * 3.6, 0, zone.z - tz * 3.6); scene.add(l2);
+  colliders.push({ x: l1.position.x, z: l1.position.z, r: 0.6 });
+  colliders.push({ x: l2.position.x, z: l2.position.z, r: 0.6 });
 
   const label = makeLabel(zone.title);
   label.position.set(zone.x, 8.5, zone.z);
   scene.add(label);
 
   // A small village: two huts flanking each gate, set back and facing center.
-  const len = Math.hypot(zone.x, zone.z) || 1;
-  const ux = zone.x / len, uz = zone.z / len;   // outward from center
-  const tx = -uz, tz = ux;                       // tangent
   for (const side of [-1, 1]) {
     const hut = makeHut();
-    hut.position.set(
-      zone.x + tx * 7 * side + ux * 2.5,
-      0,
-      zone.z + tz * 7 * side + uz * 2.5
-    );
+    const hx = zone.x + tx * 8 * side + ux * 3;
+    const hz = zone.z + tz * 8 * side + uz * 3;
+    hut.position.set(hx, 0, hz);
     hut.lookAt(0, 1, 0);
     hut.rotation.y += (Math.random() - 0.5) * 0.3;
     scene.add(hut);
+    colliders.push({ x: hx, z: hz, r: 1.9 });
   }
 });
 
@@ -448,127 +475,143 @@ function makeCar() {
   const trim = new THREE.MeshStandardMaterial({ color: '#2a2a2c', roughness: 0.7 });
   const glassMat = new THREE.MeshStandardMaterial({ color: '#2c3c40', roughness: 0.12, metalness: 0.5 });
   const chrome = new THREE.MeshStandardMaterial({ color: '#c8c8c8', roughness: 0.35, metalness: 0.6 });
+  const red = new THREE.MeshStandardMaterial({ color: '#a52828', roughness: 0.5, emissive: '#3a0000', emissiveIntensity: 0.35 });
+  const amber = new THREE.MeshStandardMaterial({ color: '#e8943a', emissive: '#5a3000', emissiveIntensity: 0.3 });
 
-  // Defender silhouette: short flat hood up front, a tall upright cabin
-  // behind it, flat roof, near-vertical windscreen, squared rear.
-  // z+ = front. Hood spans roughly z 0.4..1.9; cabin spans z -1.9..0.5.
+  // Land Rover Defender: boxy, upright, flat panels. z+ = front.
+  // Two-box shape — short flat hood, tall square cabin, flat roof, vertical
+  // rear door with the spare wheel, square lamps. Body ~ 4.0 long, 2.0 wide.
 
-  // Lower body tub (white) — long and flat
-  const tub = new THREE.Mesh(new THREE.BoxGeometry(1.92, 0.78, 3.7), white);
-  tub.position.y = 1.0; tub.castShadow = true; g.add(tub);
+  // Lower body tub + black side cladding + sill
+  const tub = new THREE.Mesh(new THREE.BoxGeometry(1.96, 0.84, 3.8), white);
+  tub.position.y = 1.06; tub.castShadow = true; g.add(tub);
+  const clad = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.3, 3.5), trim);
+  clad.position.y = 0.82; g.add(clad);
+  const sill = new THREE.Mesh(new THREE.BoxGeometry(1.99, 0.14, 3.4), black);
+  sill.position.y = 0.62; g.add(sill);
 
-  // Black sill strip along the bottom of the doors
-  const sill = new THREE.Mesh(new THREE.BoxGeometry(1.96, 0.18, 3.5), trim);
-  sill.position.y = 0.66; g.add(sill);
+  // Flat hood (lower than the cabin) with the raised centre panel
+  const hood = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.18, 1.55), white);
+  hood.position.set(0, 1.55, 1.08); hood.castShadow = true; g.add(hood);
+  const hoodPanel = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.1, 1.35), white);
+  hoodPanel.position.set(0, 1.65, 1.02); g.add(hoodPanel);
 
-  // Flat hood (sits on the front part of the tub, lower than the cabin)
-  const hood = new THREE.Mesh(new THREE.BoxGeometry(1.84, 0.16, 1.5), white);
-  hood.position.set(0, 1.42, 1.15); hood.castShadow = true; g.add(hood);
-  // raised center hood panel (Defender detail)
-  const hoodPanel = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.08, 1.3), white);
-  hoodPanel.position.set(0, 1.52, 1.1); g.add(hoodPanel);
+  // Tall upright cabin shell, set behind the hood
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.97, 1.12, 2.55), white);
+  cabin.position.set(0, 2.02, -0.42); cabin.castShadow = true; g.add(cabin);
 
-  // Tall upright cabin shell (white), set behind the hood
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.0, 2.4), white);
-  cabin.position.set(0, 1.9, -0.45); cabin.castShadow = true; g.add(cabin);
-
-  // Window band wrapping the cabin (poke out slightly past the white)
-  const winSide = new THREE.Mesh(new THREE.BoxGeometry(1.94, 0.46, 2.0), glassMat);
-  winSide.position.set(0, 2.02, -0.45); g.add(winSide);
-  // Near-vertical windscreen at the front face of the cabin
-  const windscreen = new THREE.Mesh(new THREE.BoxGeometry(1.78, 0.62, 0.12), glassMat);
-  windscreen.position.set(0, 2.0, 0.78);
-  windscreen.rotation.x = -0.12;
-  g.add(windscreen);
-  // White window pillars to break the glass into windows
-  for (const sx of [-0.95, -0.32, 0.32, 0.95]) {
-    const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.1), white);
-    pillar.position.set(sx, 2.02, 0.6); g.add(pillar);
+  // Side window band + near-vertical windscreen
+  const winSide = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.52, 2.05), glassMat);
+  winSide.position.set(0, 2.18, -0.42); g.add(winSide);
+  const windscreen = new THREE.Mesh(new THREE.BoxGeometry(1.84, 0.62, 0.12), glassMat);
+  windscreen.position.set(0, 2.2, 0.83); windscreen.rotation.x = -0.1; g.add(windscreen);
+  // vertical white pillars splitting the side glass into windows
+  for (const sx of [-0.98, 0.98]) {
+    for (const sz of [0.8, -0.1, -1.0, -1.65]) {
+      const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.54, 0.12), white);
+      pillar.position.set(sx, 2.18, sz); g.add(pillar);
+    }
   }
-  for (const sz of [0.55, -0.45, -1.45]) {
-    const pl = new THREE.Mesh(new THREE.BoxGeometry(1.96, 0.5, 0.1), white);
-    pl.position.set(0, 2.02, sz);
-    // only thin slices act as pillars — keep them narrow in x via scale
-    pl.scale.x = 0.06; g.add(pl);
+  // signature Defender "Alpine" roof side-windows (small, high, toward the rear)
+  for (const sx of [-0.99, 0.99]) {
+    const aw = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.22, 1.3), glassMat);
+    aw.position.set(sx, 2.52, -0.8); g.add(aw);
   }
 
   // Flat roof + roof rack
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(1.92, 0.14, 2.46), white);
-  roof.position.set(0, 2.45, -0.45); roof.castShadow = true; g.add(roof);
-  const rack = new THREE.Mesh(new THREE.BoxGeometry(1.74, 0.1, 2.2), trim);
-  rack.position.set(0, 2.57, -0.45); rack.castShadow = true; g.add(rack);
-  for (const sx of [-0.8, 0, 0.8]) {
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.14, 2.2), trim);
-    rail.position.set(sx, 2.58, -0.45); g.add(rail);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(1.99, 0.16, 2.62), white);
+  roof.position.set(0, 2.62, -0.42); roof.castShadow = true; g.add(roof);
+  const rack = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.1, 2.35), trim);
+  rack.position.set(0, 2.74, -0.42); rack.castShadow = true; g.add(rack);
+  for (const sx of [-0.82, 0, 0.82]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.16, 2.35), trim);
+    rail.position.set(sx, 2.75, -0.42); g.add(rail);
   }
 
-  // Front face: black grille panel + two big round headlights + bumper
-  const front = new THREE.Mesh(new THREE.BoxGeometry(1.84, 0.62, 0.12), trim);
-  front.position.set(0, 1.15, 1.9); g.add(front);
-  const grille = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.5, 0.1), black);
-  grille.position.set(0, 1.15, 1.95); g.add(grille);
+  // Front face: black grille panel + slats + round headlights + bumper
+  const front = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.66, 0.14), trim);
+  front.position.set(0, 1.2, 1.88); g.add(front);
+  const grille = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.54, 0.1), black);
+  grille.position.set(0, 1.2, 1.94); g.add(grille);
   for (let i = -2; i <= 2; i++) {
-    const slat = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.46, 0.12), chrome);
-    slat.position.set(i * 0.13, 1.15, 1.97); g.add(slat);
+    const slat = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.5, 0.12), chrome);
+    slat.position.set(i * 0.15, 1.2, 1.96); g.add(slat);
   }
-  const headGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.14, 18);
-  for (const sx of [-0.62, 0.62]) {
+  const headGeo = new THREE.CylinderGeometry(0.21, 0.21, 0.14, 18);
+  for (const sx of [-0.66, 0.66]) {
     const ring = new THREE.Mesh(headGeo, chrome);
-    ring.rotation.x = Math.PI / 2; ring.position.set(sx, 1.18, 1.95); g.add(ring);
+    ring.rotation.x = Math.PI / 2; ring.position.set(sx, 1.22, 1.92); g.add(ring);
     const bulb = new THREE.Mesh(
       new THREE.CircleGeometry(0.15, 18),
       new THREE.MeshStandardMaterial({ color: '#fff6da', emissive: '#ffe6a8', emissiveIntensity: 0.7 })
     );
-    bulb.position.set(sx, 1.18, 2.02); g.add(bulb);
+    bulb.position.set(sx, 1.22, 1.995); g.add(bulb);
   }
-  const bumper = new THREE.Mesh(new THREE.BoxGeometry(1.98, 0.24, 0.26), trim);
-  bumper.position.set(0, 0.72, 1.92); bumper.castShadow = true; g.add(bumper);
-  // small round front indicators
-  for (const sx of [-0.88, 0.88]) {
-    const ind = new THREE.Mesh(
-      new THREE.CircleGeometry(0.07, 12),
-      new THREE.MeshStandardMaterial({ color: '#e8943a' })
-    );
-    ind.position.set(sx, 1.0, 1.97); g.add(ind);
+  const bumper = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.26, 0.3), trim);
+  bumper.position.set(0, 0.74, 1.9); bumper.castShadow = true; g.add(bumper);
+  for (const sx of [-0.92, 0.92]) {
+    const ind = new THREE.Mesh(new THREE.CircleGeometry(0.08, 12), amber);
+    ind.position.set(sx, 1.02, 1.955); g.add(ind);
   }
 
-  // Rear: squared tail + spare wheel on the side-hinged door
-  const tail = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.2, 0.1), white);
-  tail.position.set(0, 1.3, -1.9); g.add(tail);
-  const spare = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.28, 20), black);
-  spare.rotation.x = Math.PI / 2; spare.position.set(0.35, 1.3, -1.98);
+  // --- Rear (the part that should read clearly as a Defender) ---
+  const door = new THREE.Mesh(new THREE.BoxGeometry(1.92, 1.18, 0.12), white);
+  door.position.set(0, 1.34, -1.92); g.add(door);
+  // top-hinged rear window (offset left of the spare)
+  const rearWin = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.5, 0.06), glassMat);
+  rearWin.position.set(-0.45, 1.72, -1.98); g.add(rearWin);
+  // spare wheel mounted off-centre on the door (with bracket)
+  const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.16, 0.16), trim);
+  bracket.position.set(0.42, 1.34, -1.98); g.add(bracket);
+  const spare = new THREE.Mesh(new THREE.CylinderGeometry(0.54, 0.54, 0.34, 20), black);
+  spare.rotation.x = Math.PI / 2; spare.position.set(0.42, 1.34, -2.12);
   spare.castShadow = true; g.add(spare);
-  const spareHub = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.3, 12), chrome);
-  spareHub.rotation.x = Math.PI / 2; spareHub.position.set(0.35, 1.3, -1.99); g.add(spareHub);
+  const spareHub = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.36, 8), chrome);
+  spareHub.rotation.x = Math.PI / 2; spareHub.position.set(0.42, 1.34, -2.14); g.add(spareHub);
+  // square tail lights low on the corners
+  for (const sx of [-0.78, 0.78]) {
+    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.36, 0.08), red);
+    tl.position.set(sx, 0.98, -1.99); g.add(tl);
+  }
+  // number plate + rear bumper
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.2, 0.05), new THREE.MeshStandardMaterial({ color: '#dcdcc8' }));
+  plate.position.set(-0.45, 0.98, -1.99); g.add(plate);
+  const rbump = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.26, 0.3), trim);
+  rbump.position.set(0, 0.74, -1.92); rbump.castShadow = true; g.add(rbump);
 
   // Black wheel arches over each wheel
-  for (const sz of [1.2, -1.2]) {
-    for (const sx of [-0.99, 0.99]) {
-      const arch = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.55, 1.15), trim);
-      arch.position.set(sx, 0.78, sz); g.add(arch);
+  for (const sz of [1.25, -1.25]) {
+    for (const sx of [-1.0, 1.0]) {
+      const arch = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.58, 1.22), trim);
+      arch.position.set(sx, 0.82, sz); g.add(arch);
     }
   }
 
-  // Chunky off-road wheels (each a group so it can roll)
+  // --- Wheels: front wheels steer (pivot.rotation.y), all wheels roll ---
   const tyre = new THREE.MeshStandardMaterial({ color: '#131313', roughness: 0.95 });
-  const wheelGeo = new THREE.CylinderGeometry(0.54, 0.54, 0.44, 20);
-  const hubGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.46, 10);
-  const wheels = [];
+  const wheelGeo = new THREE.CylinderGeometry(0.56, 0.56, 0.46, 20);
+  const hubGeo = new THREE.CylinderGeometry(0.23, 0.23, 0.48, 10);
+  const rollWheels = [];
+  const steerWheels = [];
   const offs = [
-    [-1.0, 0.54, 1.2], [1.0, 0.54, 1.2],
-    [-1.0, 0.54, -1.2], [1.0, 0.54, -1.2],
+    { x: -1.0, z: 1.25, front: true }, { x: 1.0, z: 1.25, front: true },
+    { x: -1.0, z: -1.25, front: false }, { x: 1.0, z: -1.25, front: false },
   ];
   offs.forEach((o) => {
-    const wheel = new THREE.Group();
+    const pivot = new THREE.Group();        // steers (yaw) for front wheels
+    pivot.position.set(o.x, 0.56, o.z);
+    const roll = new THREE.Group();          // spins (rolls)
     const tire = new THREE.Mesh(wheelGeo, tyre);
-    tire.rotation.z = Math.PI / 2; tire.castShadow = true; wheel.add(tire);
+    tire.rotation.z = Math.PI / 2; tire.castShadow = true; roll.add(tire);
     const hub = new THREE.Mesh(hubGeo, chrome);
-    hub.rotation.z = Math.PI / 2; wheel.add(hub);
-    wheel.position.set(...o);
-    g.add(wheel);
-    wheels.push(wheel);
+    hub.rotation.z = Math.PI / 2; roll.add(hub);
+    pivot.add(roll);
+    g.add(pivot);
+    rollWheels.push(roll);
+    if (o.front) steerWheels.push(pivot);
   });
-  g.userData.wheels = wheels;
+  g.userData.rollWheels = rollWheels;
+  g.userData.steerWheels = steerWheels;
   return g;
 }
 
@@ -617,6 +660,24 @@ if (isTouch) {
   });
 }
 
+// Drag anywhere on the scene to orbit the camera (e.g. to look at the front).
+// camYaw is declared in the driving section; it eases back behind while driving.
+let dragging = false, lastDragX = 0;
+function dragStart(e) { dragging = true; lastDragX = (e.touches ? e.touches[0] : e).clientX; }
+function dragMove(e) {
+  if (!dragging) return;
+  const x = (e.touches ? e.touches[0] : e).clientX;
+  camYaw = THREE.MathUtils.clamp(camYaw - (x - lastDragX) * 0.006, -Math.PI, Math.PI);
+  lastDragX = x;
+}
+function dragEnd() { dragging = false; }
+canvas.addEventListener('mousedown', dragStart);
+window.addEventListener('mousemove', dragMove);
+window.addEventListener('mouseup', dragEnd);
+canvas.addEventListener('touchstart', dragStart, { passive: true });
+canvas.addEventListener('touchmove', dragMove, { passive: true });
+canvas.addEventListener('touchend', dragEnd);
+
 // ---------------------------------------------------------------------------
 // Content panel
 // ---------------------------------------------------------------------------
@@ -644,32 +705,48 @@ soundBtn.addEventListener('click', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Driving physics + loop
+// Driving physics + loop  (delta-timed so speed is frame-rate independent)
 // ---------------------------------------------------------------------------
-const MAX_SPEED = 0.42;
-const ACCEL = 0.012;
-const FRICTION = 0.96;
-const TURN = 0.045;
-const WORLD_RADIUS = 158;
+const MAX_SPEED = 0.95;     // forward top speed (units per 1/60 s)
+const REVERSE_MAX = 0.45;
+const ACCEL = 0.03;         // throttle
+const FRICTION = 0.985;     // rolling resistance (momentum)
+const TURN_GAIN = 0.08;     // heading change per unit steer at full speed
+const MAX_STEER = 0.52;     // max front-wheel angle (rad)
+const STEER_LERP = 0.18;    // how quickly the wheels turn to target
+const WORLD_RADIUS = 156;
+const CAR_RADIUS = 1.3;     // for object collisions
 
+let steer = 0;              // current front-wheel angle
+let camYaw = 0;            // camera orbit offset (drag to look around)
 const clock = new THREE.Clock();
 
 function update() {
-  // accelerate / brake
-  if (keys.up) carState.speed += ACCEL;
-  if (keys.down) carState.speed -= ACCEL;
-  carState.speed *= FRICTION;
-  carState.speed = THREE.MathUtils.clamp(carState.speed, -MAX_SPEED * 0.5, MAX_SPEED);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const f = dt * 60; // 1.0 at 60fps
 
-  // steering scales with speed (can't turn while parked)
+  // throttle / brake / reverse
+  if (keys.up) carState.speed += ACCEL * f;
+  else if (keys.down) carState.speed -= ACCEL * f;
+  carState.speed *= Math.pow(FRICTION, f);
+  carState.speed = THREE.MathUtils.clamp(carState.speed, -REVERSE_MAX, MAX_SPEED);
+  if (Math.abs(carState.speed) < 0.0008) carState.speed = 0;
+
+  // front-wheel steering — eases toward the held direction
+  let steerTarget = 0;
+  if (keys.left) steerTarget += MAX_STEER;
+  if (keys.right) steerTarget -= MAX_STEER;
+  steer += (steerTarget - steer) * Math.min(1, STEER_LERP * f);
+  car.userData.steerWheels.forEach((p) => { p.rotation.y = steer; });
+
+  // turn the body from the steering (more effect with more speed)
+  const speedFactor = THREE.MathUtils.clamp(Math.abs(carState.speed) / MAX_SPEED, 0, 1);
   const dir = carState.speed >= 0 ? 1 : -1;
-  const steerAmount = TURN * THREE.MathUtils.clamp(Math.abs(carState.speed) / MAX_SPEED * 3, 0, 1);
-  if (keys.left) carState.heading += steerAmount * dir;
-  if (keys.right) carState.heading -= steerAmount * dir;
+  carState.heading += steer * TURN_GAIN * speedFactor * dir * f;
 
   // move
-  carState.x += Math.sin(carState.heading) * carState.speed;
-  carState.z += Math.cos(carState.heading) * carState.speed;
+  carState.x += Math.sin(carState.heading) * carState.speed * f;
+  carState.z += Math.cos(carState.heading) * carState.speed * f;
 
   // keep inside the world
   const distFromCenter = Math.hypot(carState.x, carState.z);
@@ -684,23 +761,38 @@ function update() {
     carState.z *= CASTLE_RADIUS / distFromCenter;
     carState.speed *= 0.3;
   }
+  // collide with solid objects (gates, trees, lanterns, huts)
+  for (const c of colliders) {
+    const dx = carState.x - c.x, dz = carState.z - c.z;
+    const d = Math.hypot(dx, dz);
+    const minD = c.r + CAR_RADIUS;
+    if (d < minD && d > 0.0001) {
+      carState.x = c.x + (dx / d) * minD;
+      carState.z = c.z + (dz / d) * minD;
+      carState.speed *= 0.35; // bump kills most of the momentum
+    }
+  }
 
   car.position.set(carState.x, 0, carState.z);
   car.rotation.y = carState.heading;
 
-  // spin wheels
-  const spin = carState.speed * 1.6;
-  car.userData.wheels.forEach((w) => { w.rotation.x += spin; });
+  // spin all wheels
+  const spin = carState.speed * 1.5 * f;
+  car.userData.rollWheels.forEach((w) => { w.rotation.x += spin; });
 
-  // follow camera (skippable in dev for inspection)
+  // follow camera (skippable in dev for inspection). camYaw lets the player
+  // drag to look around; it eases back behind the car while driving.
   if (!(import.meta.env && import.meta.env.DEV && window.__freezeCam)) {
-    const camDist = 12, camHeight = 6.5;
-    const targetCamX = carState.x - Math.sin(carState.heading) * camDist;
-    const targetCamZ = carState.z - Math.cos(carState.heading) * camDist;
-    camera.position.x += (targetCamX - camera.position.x) * 0.08;
-    camera.position.z += (targetCamZ - camera.position.z) * 0.08;
-    camera.position.y += (camHeight - camera.position.y) * 0.08;
-    camera.lookAt(carState.x, 1.2, carState.z);
+    if (keys.up || keys.down) camYaw *= Math.pow(0.93, f);
+    const ang = carState.heading + camYaw;
+    const camDist = 12.5, camHeight = 6.2;
+    const targetCamX = carState.x - Math.sin(ang) * camDist;
+    const targetCamZ = carState.z - Math.cos(ang) * camDist;
+    const lerp = 1 - Math.pow(1 - 0.1, f);
+    camera.position.x += (targetCamX - camera.position.x) * lerp;
+    camera.position.z += (targetCamZ - camera.position.z) * lerp;
+    camera.position.y += (camHeight - camera.position.y) * lerp;
+    camera.lookAt(carState.x, 1.4, carState.z);
   }
 
   // zone proximity
