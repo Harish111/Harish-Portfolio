@@ -68,13 +68,58 @@ scene.add(path);
 
 // Inner courtyard disc the castle sits on
 const courtyard = new THREE.Mesh(
-  new THREE.CircleGeometry(14, 48),
+  new THREE.CircleGeometry(13.5, 48),
   new THREE.MeshStandardMaterial({ color: '#c7c0b1', roughness: 1 })
 );
 courtyard.rotation.x = -Math.PI / 2;
 courtyard.position.y = 0.03;
 courtyard.receiveShadow = true;
 scene.add(courtyard);
+
+// --- Moat: a ring of water around the castle, with flowing highlights ---
+const MOAT_IN = 13.5, MOAT_OUT = 18;
+const water = new THREE.Mesh(
+  new THREE.RingGeometry(MOAT_IN, MOAT_OUT, 64),
+  new THREE.MeshStandardMaterial({ color: '#356a9c', roughness: 0.18, metalness: 0.35, transparent: true, opacity: 0.92 })
+);
+water.rotation.x = -Math.PI / 2; water.position.y = 0.06; water.receiveShadow = true;
+scene.add(water);
+// rotating lighter arcs that read as flowing current
+const moatFlow = new THREE.Group();
+for (let i = 0; i < 12; i++) {
+  const seg = new THREE.Mesh(
+    new THREE.RingGeometry(MOAT_IN + 0.4, MOAT_OUT - 0.4, 8, 1, (i / 12) * Math.PI * 2, 0.22),
+    new THREE.MeshBasicMaterial({ color: '#a6d4ec', transparent: true, opacity: 0.3 })
+  );
+  seg.rotation.x = -Math.PI / 2; seg.position.y = 0.08; moatFlow.add(seg);
+}
+scene.add(moatFlow);
+
+// --- Four red arched bridges crossing the moat (one per side) ---
+const BRIDGE_ANGLES = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
+function makeBridge() {
+  const b = new THREE.Group();
+  const deckMat = new THREE.MeshStandardMaterial({ color: '#8a5a3a', roughness: 1 });
+  const redMat = new THREE.MeshStandardMaterial({ color: '#c0392b', roughness: 0.6 });
+  const span = (MOAT_OUT - MOAT_IN) + 3.0;
+  const mid = (MOAT_IN + MOAT_OUT) / 2;
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.2, span), deckMat);
+  deck.position.set(0, 0.4, mid); deck.castShadow = true; deck.receiveShadow = true; b.add(deck);
+  for (const sx of [-1.2, 1.2]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.5, span), redMat);
+    rail.position.set(sx, 0.78, mid); rail.castShadow = true; b.add(rail);
+    for (let t = -span / 2 + 0.3; t <= span / 2 - 0.3; t += 1.3) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.75, 0.16), redMat);
+      post.position.set(sx, 0.62, mid + t); b.add(post);
+    }
+  }
+  return b;
+}
+for (const a of BRIDGE_ANGLES) {
+  const br = makeBridge();
+  br.rotation.y = a;
+  scene.add(br);
+}
 
 // Japanese castle (tenshu) — sloped stone base + white tiers, each capped by a
 // wide, shallow, dark hip roof with big overhanging eaves and a chidori-hafu
@@ -371,8 +416,12 @@ function rand(min, max) { return min + Math.random() * (max - min); }
 // Solid obstacles the car cannot drive through — circle colliders {x, z, r}.
 const colliders = [];
 
-// Keep an area clear around every gate so the gateway/approach isn't blocked.
+// Farm location (declared here so scatter can keep the plot clear).
+const FARM_X = -64, FARM_Z = 58;
+
+// Keep an area clear around every gate (and the farm) so nothing blocks them.
 function clearOfGates(x, z, pad) {
+  if (Math.hypot(x - FARM_X, z - FARM_Z) < 13) return false;
   for (const zone of ZONES) {
     if (Math.hypot(x - zone.x, z - zone.z) < pad) return false;
   }
@@ -554,17 +603,63 @@ function makeFarm() {
 
   // scarecrow
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.7, 6), woodMat);
-  pole.position.set(0, 0.85, 0); g.add(pole);
+  pole.position.set(2.5, 0.85, -3.5); g.add(pole);
   const arms = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.1, 0.1), woodMat);
-  arms.position.set(0, 1.25, 0); g.add(arms);
+  arms.position.set(2.5, 1.25, -3.5); g.add(arms);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), new THREE.MeshStandardMaterial({ color: '#d8c89a' }));
-  head.position.set(0, 1.75, 0); g.add(head);
+  head.position.set(2.5, 1.75, -3.5); g.add(head);
+
+  // --- A farmer bent over tending the crops ---
+  const skin = new THREE.MeshStandardMaterial({ color: '#c98d5a', roughness: 1 });
+  const shirt = new THREE.MeshStandardMaterial({ color: '#3a6ea5', roughness: 1 });
+  const pants = new THREE.MeshStandardMaterial({ color: '#5a4a3a', roughness: 1 });
+  const straw = new THREE.MeshStandardMaterial({ color: '#cbb074', roughness: 1, flatShading: true });
+  const farmer = new THREE.Group();
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.6, 0.36), shirt);
+  torso.position.set(0, 0.95, 0); torso.rotation.x = 0.7; torso.castShadow = true; farmer.add(torso);
+  const fhead = new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 8), skin);
+  fhead.position.set(0, 1.2, 0.32); farmer.add(fhead);
+  const hat = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.2, 12), straw);
+  hat.position.set(0, 1.31, 0.32); farmer.add(hat);
+  for (const sx of [-0.14, 0.14]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.7, 0.16), pants);
+    leg.position.set(sx, 0.35, -0.12); leg.castShadow = true; farmer.add(leg);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.5, 0.12), shirt);
+    arm.position.set(sx * 2, 0.78, 0.38); arm.rotation.x = 1.1; farmer.add(arm);
+  }
+  farmer.position.set(-3.5, 0, 2.5); farmer.rotation.y = 0.5; g.add(farmer);
+
+  // --- A small red tractor parked in the plot ---
+  const tractor = new THREE.Group();
+  const tRed = new THREE.MeshStandardMaterial({ color: '#cc3b2f', roughness: 0.55 });
+  const tDark = new THREE.MeshStandardMaterial({ color: '#222', roughness: 0.85 });
+  const tGlass = new THREE.MeshStandardMaterial({ color: '#9fd3e0', roughness: 0.2, metalness: 0.3 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.55, 1.7), tRed);
+  body.position.y = 0.85; body.castShadow = true; tractor.add(body);
+  const hoodT = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 0.8), tRed);
+  hoodT.position.set(0, 0.75, 0.95); hoodT.castShadow = true; tractor.add(hoodT);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.7, 0.7), tRed);
+  cab.position.set(0, 1.4, -0.35); cab.castShadow = true; tractor.add(cab);
+  const cabGlass = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.55, 0.74), tGlass);
+  cabGlass.position.set(0, 1.42, -0.35); tractor.add(cabGlass);
+  const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.7, 8), tDark);
+  pipe.position.set(0.3, 1.35, 1.0); tractor.add(pipe);
+  const bigWheel = new THREE.CylinderGeometry(0.55, 0.55, 0.3, 16);
+  const smallWheel = new THREE.CylinderGeometry(0.32, 0.32, 0.26, 14);
+  for (const sx of [-0.62, 0.62]) {
+    const w = new THREE.Mesh(bigWheel, tDark);
+    w.rotation.z = Math.PI / 2; w.position.set(sx, 0.55, -0.55); w.castShadow = true; tractor.add(w);
+  }
+  for (const sx of [-0.56, 0.56]) {
+    const w = new THREE.Mesh(smallWheel, tDark);
+    w.rotation.z = Math.PI / 2; w.position.set(sx, 0.32, 0.95); w.castShadow = true; tractor.add(w);
+  }
+  tractor.position.set(5.5, 0, -2.5); tractor.rotation.y = -0.5; g.add(tractor);
 
   g.userData.fencePts = fencePts;
   return g;
 }
 const farm = makeFarm();
-const FARM_X = -64, FARM_Z = 58;
 farm.position.set(FARM_X, 0, FARM_Z);
 scene.add(farm);
 // fence colliders so the car drives around the plot, not through the crops
@@ -847,12 +942,24 @@ soundBtn.addEventListener('click', () => {
   creditEl.classList.toggle('hidden', !on);
 });
 
+// Drive-mode buttons (Normal / Sport)
+document.querySelectorAll('.mode-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    driveMode = btn.dataset.mode;
+    document.querySelectorAll('.mode-btn').forEach((b) => b.classList.toggle('active', b === btn));
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Driving physics + loop  (delta-timed so speed is frame-rate independent)
 // ---------------------------------------------------------------------------
-const MAX_SPEED = 0.95;     // forward top speed (units per 1/60 s)
-const REVERSE_MAX = 0.45;
-const ACCEL = 0.03;         // throttle
+// Drive modes — Normal is the calmer default (the old top speed felt too high).
+const MODES = {
+  normal: { max: 0.55, accel: 0.022 },
+  sport: { max: 1.15, accel: 0.045 },
+};
+let driveMode = 'normal';
+const REVERSE_MAX = 0.42;
 const FRICTION = 0.985;     // rolling resistance (momentum)
 const TURN_GAIN = 0.08;     // heading change per unit steer at full speed
 const MAX_STEER = 0.52;     // max front-wheel angle (rad)
@@ -891,11 +998,12 @@ function update() {
     return; // no driving until it lands
   }
 
-  // throttle / brake / reverse
-  if (keys.up) carState.speed += ACCEL * f;
-  else if (keys.down) carState.speed -= ACCEL * f;
+  // throttle / brake / reverse (speed + acceleration come from the drive mode)
+  const mode = MODES[driveMode];
+  if (keys.up) carState.speed += mode.accel * f;
+  else if (keys.down) carState.speed -= mode.accel * f;
   carState.speed *= Math.pow(FRICTION, f);
-  carState.speed = THREE.MathUtils.clamp(carState.speed, -REVERSE_MAX, MAX_SPEED);
+  carState.speed = THREE.MathUtils.clamp(carState.speed, -REVERSE_MAX, mode.max);
   if (Math.abs(carState.speed) < 0.0008) carState.speed = 0;
 
   // front-wheel steering — eases toward the held direction
@@ -906,7 +1014,7 @@ function update() {
   car.userData.steerWheels.forEach((p) => { p.rotation.y = steer; });
 
   // turn the body from the steering (more effect with more speed)
-  const speedFactor = THREE.MathUtils.clamp(Math.abs(carState.speed) / MAX_SPEED, 0, 1);
+  const speedFactor = THREE.MathUtils.clamp(Math.abs(carState.speed) / mode.max, 0, 1);
   const dir = carState.speed >= 0 ? 1 : -1;
   carState.heading += steer * TURN_GAIN * speedFactor * dir * f;
 
@@ -927,6 +1035,20 @@ function update() {
     carState.z *= CASTLE_RADIUS / distFromCenter;
     carState.speed *= 0.3;
   }
+  // the moat blocks the car except where a bridge crosses it
+  if (distFromCenter > MOAT_IN - 0.4 && distFromCenter < MOAT_OUT + 0.4) {
+    const ang = Math.atan2(carState.x, carState.z);
+    const onBridge = BRIDGE_ANGLES.some((a) => {
+      const dd = Math.atan2(Math.sin(ang - a), Math.cos(ang - a));
+      return Math.abs(dd) < 0.16;
+    });
+    if (!onBridge) {
+      const target = distFromCenter < (MOAT_IN + MOAT_OUT) / 2 ? MOAT_IN - 0.5 : MOAT_OUT + 0.5;
+      carState.x *= target / distFromCenter;
+      carState.z *= target / distFromCenter;
+      carState.speed *= 0.4;
+    }
+  }
   // collide with solid objects (gates, trees, lanterns, huts)
   for (const c of colliders) {
     const dx = carState.x - c.x, dz = carState.z - c.z;
@@ -945,6 +1067,9 @@ function update() {
   // spin all wheels
   const spin = carState.speed * 1.5 * f;
   car.userData.rollWheels.forEach((w) => { w.rotation.x += spin; });
+
+  // animate the moat's flowing current
+  moatFlow.rotation.y += 0.004 * f;
 
   // follow camera (skippable in dev for inspection). camYaw lets the player
   // drag to look around; forward eases it behind, reverse swings it to the
